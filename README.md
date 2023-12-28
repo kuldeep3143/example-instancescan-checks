@@ -1,6 +1,8 @@
+![instance-scan-check-banner](https://github.com/Lacah/example-instancescan-checks/assets/47461634/2dc8c308-a249-41ca-89f6-26bc68749f7c)
+
 # example-instancescan-checks
 
-Open-Sourced community contributed and owned repository for Instance Scan Definitions. [ServiceNow Instance Scan](https://docs.servicenow.com/bundle/rome-servicenow-platform/page/administer/health-scan/reference/hs-landing-page.html) The checks contained in this repository are therefore considered "use at your own risk" and will rely on the open-source community to help drive fixes and feature enhancements via Issues and community members issuing and reviewing PRs. ServiceNow is not providing or authenticating these definitions. Occasionally, ServiceNow employees may choose to contribute to the open-source project as members of the community as they see fit, this does not constitute a service or product from ServiceNow.
+Open-Sourced community contributed and owned repository for Instance Scan Definitions. [ServiceNow Instance Scan](https://docs.servicenow.com/csh?topicname=hs-landing-page&version=latest) The checks contained in this repository are therefore considered "use at your own risk" and will rely on the open-source community to help drive fixes and feature enhancements via Issues and community members issuing and reviewing PRs. ServiceNow is not providing or authenticating these definitions. Occasionally, ServiceNow employees may choose to contribute to the open-source project as members of the community as they see fit, this does not constitute a service or product from ServiceNow.
 
 🔔🔔🔔<br>
 ***CONTRIBUTORS must follow all guidelines in [CONTRIBUTING.md](CONTRIBUTING.md)*** or run the risk of having your Pull Requests labeled as spam.<br>
@@ -107,6 +109,44 @@ Comments and description add extra information int he scripts and usally help in
 ### Active groups without active users
 Groups are commonly used in business process for approvals, and notifications. Avoiding groups that are empty, or contain only inactive users, can cause processes to halt or provide unexpected results.
 
+### Valid Script Include Name - No Spaces
+Script Includes names should not include spaces since it is not possible to call them if there is a space in the name.
+
+### Roles assigned to non-existing users
+Identify role assignments (sys_user_has_role) for users that do not exists
+
+### Check the incidents that are closed or canceled but still active
+This is a table check on the incidents table that verifies if there are closed or canceled incidents in the active state, which would be a sign that the close_states are not set correctly on the incident table. This check can be done on any table, especially there where the State model was changed from OOTB or for custom extended tables. The problem with this kind of records is that they can influence the reports on active records on the respective table.
+
+
+### Open Requests with closed requested items
+If all the requested items in a request are closed, the request should close automatically. If the request does not close automatically, probably the flows of the items do not set the stages correctly, or the default Stages for requested items were changed and the Completed Stage does not have the correct value. This can display the active requests that actually are closed in reports and also can cause confusion for users who will see their requests still open.
+
+### Integration users shouldn't be admin
+Finds integration users that have assigned admin role - there are two types:
+- webapi with a flag: Web service access only | web_service_access_only
+- internal with a flag: Internal Integration User ! internal_integration_user
+  
+### Update set In Progress previously completed
+Already completed Update Set shouldn't be set back to In Pogress
+There is risk that even for a moment completed update set were retrieved to higher environment and won't be retrieved once again after more modifications are done on lower environment
+
+### Active notifications with empty any recipients class
+For notification records there are condition to be met, active flag - they indicates that some notificaton should reach recipients
+It happens from time to time that after development or conifguration all the three classes of recpients can be empty:
+- Users | recipient_users
+- Users/Groups in fields | recipient_fields
+- Groups | recipient_groups
+It can cause except issue with manageability also some performance impact - to verify active notification against some conditions and at the end no notification produced
+
+### Dashboard Onwer no longer active
+For the dashboard there should be an active owner who can administer/customize/adjust dashboards.
+During the time it can be a situation that person is no longer active in the system. It can be discovered and fixed with new person.
+
+### Unsupported API GlideLDAP
+GlideLDAP API usage is unsupported by ServiceNow and hence should be avoided, rather use LDAP Server Data Sources to pull data from LDAP via MID Server or directly through an internet facing LDAP.
+
+
 ## Category: Upgradability
 
 ### Call GlideRecord using new
@@ -174,6 +214,22 @@ api.controller = function ($rootScope, $scope) {
 ### Provide alternate value when fetching Glide property
 Recommendation to provide alternate/default value when calling gs.getProperty() to avoid errors if the property is not set. 
 
+### Using setValue()'s displayValue Parameter with Reference Fields
+When using setValue() on a reference field, be sure to include the display value with the value (sys_id). If you set the value without the display value, ServiceNow does a synchronous Ajax call to retrieve the display value for the record you specified. This extra round trip to the server can leave you at risk of performance issues.
+
+### Running Business Rules on Transform Maps 
+Running business rules during transform may cause the transform to take longer than expected, or cause the instance to slow down.Do not run items like business rules, workflows, approval engines, and so on during a transform unless you want all insert and update business rules, notifications, and workflows to run
+
+### Avoid using getReference()
+getReference is no longer considered best practice due to its performance impact and it is recommended to use g_scratchpad or GlideAjax instead.
+
+### Restrict  rowcount to 10,20,50 max from user preference table
+Restrict the number of row counts ma x to 10,20,50 instead of higher limits such as 100 and 1000 to tune the performance on different tables when users interact. This increases the user experience and platform performance as well. Since it is exposed to potentially slower performance due to having query, process ACL, and then render more records.
+
+Navigate to the user preference <sys_user_preference> table and search by 'rowcount'. Set the value to 50 max.
+Also, can set the property 'glide.ui.per_page' sys property value to 10, 20, 50 only
+
+
 ## Category: Security
 ##Check Mandatory fields on incident
 This check is used to find mandatory fields on incident
@@ -224,12 +280,14 @@ Review the flow contexts that are in waiting, in progress or queued state and ru
 ### Active users with past employment end date
 Review the users whose employement end date is in the past and the user is still active, this is a potential threat to the security of the platform. 
 
-#Access controls on UI Pages
- - When there is no ACL for an UI Page, by default the UI Page can be accessed by all the logged-in internal users. If there is no, script level authorization checks like gs.hasRole('user_admin'), then any logged in user can access this UI Page and change anybody's password by passing the user sys_id and the new password.
+### Set glide.invalid_query.returns_no_rows to true
+The "glide.invalid_query.returns_no_rows" property provides a safeguard against queries running which could return unintended data which could then be deleted, manipulated or used incorrectly. It is recommended to have this property exist and be set to true. When this property does not exist an invalid query will return all rows. 
 
-##Access controls on Tables
- - Tables should be secured with access controls, data in the table should be limited access to only necessary audience.
- - Make sure that all tables should have ACL's. Rules for access control lists (ACLs) restrict access to data by requiring users to pass a set of requirements before they can interact with it.
+### Use GlideRecordSecure instead of GlideRecord API for Client Callable Script Include
+Use GlideRecordSecure API to ensure the security checks are performed and unauthorized access of data is prevented as it will automatically enforce ACLs.
+
+### For loop iterators "i" should be declared
+In general, variables in JavaScript should be properly declared (e.g. using “var”). The declaration defines the scope of the variable, ensuring it's accessible only within the intended block. This prevents unintended variable pollution and conflicts. Especially in for loops, often an iterator “i” is used and not properly declared. For example “for (i=0; i<10; i++)” instead of “for (var i=0; i<10; i++)”.  As a result, this could unintentionally alter the value of other 'i' iterators in different for loops.
 
 ## Category: User Experience
 
@@ -244,6 +302,12 @@ List inactive users that still belongs to activate groups
 When cloned, records from http_connection table which is extended from sys_connection table is orphaned or cannot be viewed. Even though clone is excluding and preserving sys_connection but not any data on http_connection and hence clone leaves the orphan record on the table sys_connection and this creates issues to view, delete those records. Login to the production instance and check to see if the http_connection table is excluded in the exclude tables module under System Clones.
 Note: It was suggested by ServiceNow support to add table "http_connection" in clone excluder and preserver for one the cases as i faced an similar issue.
 
+### Avoid using alert() in client scripts
+It is recommended to use an OOB library for modals in order to improve the user experience instead of alert().
+
+### Use "last run datetime" for JDBC data loads
+In your JDBC data load configuration, ensure that the 'last run datetime' option is set to true and configure the target database field to serve as a timestamp, as this best practice enables incremental data loading and improves performance in data integration processes using JDBC.
+
 # Additional resources
 
 Please check these additional links for more information and details:
@@ -252,5 +316,5 @@ Please check these additional links for more information and details:
 - [Mark Roethof’s Blogs](https://community.servicenow.com/community?id=community_blog&sys_id=14e51965db2200d013b5fb24399619fb#is)
 - [Live Coding Happy Hour – Instance Scan in Quebec (2021-03-12)](https://youtu.be/_cPlWnh1Z68)
 - [Introduction to ServiceNow HealthScan and Instance Scan](https://nowlearning.service-now.com/lxp?id=overview&sys_id=e4c538231b0d6c505b2699f4bd4bcb6f&type=course)
-- [K21 CCL1062 – Writing custom instance scan checks](https://nowlearning.service-now.com/lxp?id=overview&sys_id=8d9db4921b7fe010a5e699b1b24bcbdd&type=course)
+- [K21 CCL1062 – Writing custom instance scan checks](https://nowlearning.servicenow.com/lxp/en/now-platform/introduction-to-servicenow-healthscan-and-instance-scan?id=learning_course_prev&course_id=fc3014c5db728150a87c2d3d569619d5)
 - [Quebec Instance Scan](https://developer.servicenow.com/blog.do?p=/post/quebec-instancescan/)
